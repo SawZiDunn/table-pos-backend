@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from pymongo import ReturnDocument
 
 from database import get_db
-from schemas.shop import ShopUpsertRequest
+from schemas.shop import ShopCreateRequest, ShopUpsertRequest
 from services.mongo_helpers import BadObjectIdError, serialize_document, to_object_id
 
 
@@ -48,5 +48,19 @@ def upsert_shop(payload: ShopUpsertRequest) -> dict:
         return serialize_document(result)
 
     inserted = db.shops.insert_one(update_doc)
+    created = db.shops.find_one({"_id": inserted.inserted_id})
+    return serialize_document(created)
+
+
+def create_shop(payload: ShopCreateRequest) -> dict:
+    db = get_db()
+
+    shop_doc = {
+        "name": payload.name,
+        "settings": payload.settings.model_dump(),
+        "is_active": True,
+    }
+
+    inserted = db.shops.insert_one(shop_doc)
     created = db.shops.find_one({"_id": inserted.inserted_id})
     return serialize_document(created)
