@@ -8,7 +8,7 @@ from schemas.orders import OrderCreateRequest
 from services.mongo_helpers import BadObjectIdError, serialize_document, to_object_id
 
 
-VALID_ORDER_STATUSES = {"pending", "in_progress", "served", "cancelled", "paid"}
+VALID_ORDER_STATUSES = {"pending", "preparing", "served", "cancelled"}
 
 
 def create_order(payload: OrderCreateRequest) -> dict:

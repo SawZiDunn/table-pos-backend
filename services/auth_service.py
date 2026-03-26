@@ -35,6 +35,7 @@ def login(payload: LoginRequest) -> dict:
                 "_id": user["_id"],
                 "email": user.get("email"),
                 "name": user.get("name"),
+                "role": user.get("role", "staff"),
             }
         ),
     }
