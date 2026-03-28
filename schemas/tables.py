@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field
 class TableCreateRequest(BaseModel):
     capacity: int = Field(ge=1)
     status: str = "available"
-    shop_id: str = Field()
 
 
 class TableUpdateRequest(BaseModel):

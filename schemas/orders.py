@@ -9,7 +9,6 @@ class OrderItem(BaseModel):
 
 
 class OrderCreateRequest(BaseModel):
-    shop_id: str
     table_id: str
     session_id: str
     items: list[OrderItem] = Field(min_length=1)

@@ -6,7 +6,10 @@ from schemas.tables import TableCreateRequest, TableUpdateRequest
 from services.mongo_helpers import BadObjectIdError, serialize_document, to_object_id
 
 
-def get_tables(shop_id: str) -> list[dict]:
+def get_tables(shop_id: str | None) -> list[dict]:
+    if not shop_id:
+        return []
+
     db = get_db()
     try:
         shop_obj_id = to_object_id(shop_id, "shop_id")
@@ -17,18 +20,14 @@ def get_tables(shop_id: str) -> list[dict]:
     return [serialize_document(table) for table in tables]
 
 
-def create_table(payload: TableCreateRequest, current_user: dict) -> dict:
-    db = get_db()
-
-    shop_id = current_user.get("shop_id")
+def create_table(payload: TableCreateRequest, shop_id: str | None) -> dict:
     if not shop_id:
         raise HTTPException(status_code=400, detail="Missing shop_id for current user")
 
-    if payload.shop_id != shop_id:
-        raise HTTPException(status_code=403, detail="Shop access denied")
+    db = get_db()
 
     try:
-        shop_obj_id = to_object_id(payload.shop_id, "shop_id")
+        shop_obj_id = to_object_id(shop_id, "shop_id")
     except BadObjectIdError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -48,17 +47,16 @@ def create_table(payload: TableCreateRequest, current_user: dict) -> dict:
     return serialize_document(created)
 
 
-def update_table(table_id: str, payload: TableUpdateRequest, current_user: dict) -> dict:
+def update_table(table_id: str, payload: TableUpdateRequest, shop_id: str | None) -> dict:
+    if not shop_id:
+        raise HTTPException(status_code=400, detail="Missing shop_id for current user")
+
     db = get_db()
 
     try:
         table_obj_id = to_object_id(table_id, "id")
     except BadObjectIdError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    shop_id = current_user.get("shop_id")
-    if not shop_id:
-        raise HTTPException(status_code=400, detail="Missing shop_id for current user")
 
     try:
         shop_obj_id = to_object_id(shop_id, "shop_id")

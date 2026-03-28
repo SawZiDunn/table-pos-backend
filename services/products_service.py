@@ -6,7 +6,10 @@ from schemas.products import ProductCreateRequest, ProductUpdateRequest
 from services.mongo_helpers import BadObjectIdError, serialize_document, to_object_id
 
 
-def get_products(shop_id: str, category_id: str | None) -> list[dict]:
+def get_products(shop_id: str | None, category_id: str | None) -> list[dict]:
+    if not shop_id:
+        return []
+
     db = get_db()
 
     try:
@@ -25,11 +28,14 @@ def get_products(shop_id: str, category_id: str | None) -> list[dict]:
     return [serialize_document(product) for product in products]
 
 
-def create_product(payload: ProductCreateRequest) -> dict:
+def create_product(payload: ProductCreateRequest, shop_id: str | None) -> dict:
+    if not shop_id:
+        raise HTTPException(status_code=400, detail="User does not have an assigned shop.")
+
     db = get_db()
 
     try:
-        shop_obj_id = to_object_id(payload.shop_id, "shop_id")
+        shop_obj_id = to_object_id(shop_id, "shop_id")
     except BadObjectIdError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -53,10 +59,14 @@ def create_product(payload: ProductCreateRequest) -> dict:
     return serialize_document(created)
 
 
-def update_product(product_id: str, payload: ProductUpdateRequest) -> dict:
+def update_product(product_id: str, payload: ProductUpdateRequest, shop_id: str | None) -> dict:
+    if not shop_id:
+        raise HTTPException(status_code=400, detail="User does not have an assigned shop.")
+        
     db = get_db()
 
     try:
+        shop_obj_id = to_object_id(shop_id, "shop_id")
         product_obj_id = to_object_id(product_id, "id")
     except BadObjectIdError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -72,7 +82,7 @@ def update_product(product_id: str, payload: ProductUpdateRequest) -> dict:
         raise HTTPException(status_code=400, detail="No fields to update")
 
     updated = db.products.find_one_and_update(
-        {"_id": product_obj_id},
+        {"_id": product_obj_id, "shop_id": shop_obj_id},
         {"$set": updates},
         return_document=ReturnDocument.AFTER,
     )

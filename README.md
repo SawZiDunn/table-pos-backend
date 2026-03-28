@@ -56,7 +56,17 @@ close_db()
 
 ## Current Domain Flow
 
-- One user can have multiple shops.
+user will be created with register api and assigned role by super admin(manually for now)
+shop will be crated manually by super admin(manually for now)
+shop_id has to be manually added to user in mongo db atlas
+user log in and will be redirected to shop. but, how will we assign user and shop?
+
+- One user can have only one shop.
+- one shop can have many users (1 manager + many staff)
 - One shop has many tables.
 - One table has many table sessions.
 - One table session has many orders.
+- one shop has many products
+- one shop has many categories
+- different shops have different categories.
+- Order -> OrderItem <- Product

@@ -5,7 +5,10 @@ from schemas.categories import CategoryCreateRequest
 from services.mongo_helpers import BadObjectIdError, serialize_document, to_object_id
 
 
-def get_categories(shop_id: str) -> list[dict]:
+def get_categories(shop_id: str | None) -> list[dict]:
+    if not shop_id:
+        return []
+        
     db = get_db()
 
     try:
@@ -17,11 +20,14 @@ def get_categories(shop_id: str) -> list[dict]:
     return [serialize_document(category) for category in categories]
 
 
-def create_category(payload: CategoryCreateRequest) -> dict:
+def create_category(payload: CategoryCreateRequest, shop_id: str | None) -> dict:
+    if not shop_id:
+        raise HTTPException(status_code=400, detail="User does not have an assigned shop.")
+        
     db = get_db()
 
     try:
-        shop_obj_id = to_object_id(payload.shop_id, "shop_id")
+        shop_obj_id = to_object_id(shop_id, "shop_id")
     except BadObjectIdError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

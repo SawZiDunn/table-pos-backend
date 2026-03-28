@@ -6,16 +6,20 @@ from database import get_db
 from services.mongo_helpers import BadObjectIdError, serialize_document, to_object_id
 
 
-def get_table_session_bill(session_id: str) -> dict:
+def get_table_session_bill(session_id: str, shop_id: str | None) -> dict:
     """Calculate total bill for a table session from all orders."""
+    if not shop_id:
+        raise HTTPException(status_code=400, detail="Missing shop_id for current user")
+        
     db = get_db()
 
     try:
         session_obj_id = to_object_id(session_id, "session_id")
+        shop_obj_id = to_object_id(shop_id, "shop_id")
     except BadObjectIdError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    session = db.table_sessions.find_one({"_id": session_obj_id})
+    session = db.table_sessions.find_one({"_id": session_obj_id, "shop_id": shop_obj_id})
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -33,16 +37,20 @@ def get_table_session_bill(session_id: str) -> dict:
     }
 
 
-def close_table_session(session_id: str) -> dict:
+def close_table_session(session_id: str, shop_id: str | None) -> dict:
     """Close a table session and free the table for next customer."""
+    if not shop_id:
+        raise HTTPException(status_code=400, detail="Missing shop_id for current user")
+        
     db = get_db()
 
     try:
         session_obj_id = to_object_id(session_id, "session_id")
+        shop_obj_id = to_object_id(shop_id, "shop_id")
     except BadObjectIdError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    session = db.table_sessions.find_one({"_id": session_obj_id})
+    session = db.table_sessions.find_one({"_id": session_obj_id, "shop_id": shop_obj_id})
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 

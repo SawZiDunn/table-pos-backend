@@ -8,12 +8,15 @@ from schemas.table_sessions import TableSessionCreateRequest
 from services.mongo_helpers import BadObjectIdError, serialize_document, to_object_id
 
 
-def create_table_session(payload: TableSessionCreateRequest) -> dict:
+def create_table_session(payload: TableSessionCreateRequest, shop_id: str | None) -> dict:
+    if not shop_id:
+        raise HTTPException(status_code=400, detail="Missing shop_id for current user")
+        
     db = get_db()
 
     try:
         table_obj_id = to_object_id(payload.table_id, "table_id")
-        shop_obj_id = to_object_id(payload.shop_id, "shop_id")
+        shop_obj_id = to_object_id(shop_id, "shop_id")
     except BadObjectIdError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -36,6 +39,9 @@ def create_table_session(payload: TableSessionCreateRequest) -> dict:
 
 
 def get_open_table_sessions(shop_id: str | None, table_id: str | None) -> list[dict]:
+    if not shop_id:
+        return []
+        
     db = get_db()
 
     query: dict = {"status": "open"}
@@ -51,16 +57,20 @@ def get_open_table_sessions(shop_id: str | None, table_id: str | None) -> list[d
     return [serialize_document(session) for session in sessions]
 
 
-def close_table_session(session_id: str) -> dict:
+def close_table_session(session_id: str, shop_id: str | None) -> dict:
     """Close a table session and free the table after all orders are paid."""
+    if not shop_id:
+        raise HTTPException(status_code=400, detail="Missing shop_id for current user")
+        
     db = get_db()
 
     try:
         session_obj_id = to_object_id(session_id, "session_id")
+        shop_obj_id = to_object_id(shop_id, "shop_id")
     except BadObjectIdError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    session = db.table_sessions.find_one({"_id": session_obj_id})
+    session = db.table_sessions.find_one({"_id": session_obj_id, "shop_id": shop_obj_id})
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 

@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
 from schemas.table_sessions import TableSessionCreateRequest
+from services.auth_helpers import get_current_user
 from services.table_sessions_service import create_table_session, get_open_table_sessions, close_table_session
 from services.billing_service import get_table_session_bill
 
@@ -9,23 +10,23 @@ router = APIRouter(tags=["table_sessions"])
 
 
 @router.post("/table-sessions")
-def create_table_session_api(payload: TableSessionCreateRequest) -> dict:
-    return create_table_session(payload)
+def create_table_session_api(payload: TableSessionCreateRequest, current_user: dict = Depends(get_current_user)) -> dict:
+    return create_table_session(payload, current_user.get("shop_id"))
 
 
 @router.get("/table-sessions/open")
 def get_open_table_sessions_api(
-    shop_id: str | None = Query(default=None),
     table_id: str | None = Query(default=None),
+    current_user: dict = Depends(get_current_user)
 ) -> list[dict]:
-    return get_open_table_sessions(shop_id, table_id)
+    return get_open_table_sessions(current_user.get("shop_id"), table_id)
 
 
 @router.get("/table-sessions/{id}/bill")
-def get_table_session_bill_api(id: str) -> dict:
-    return get_table_session_bill(id)
+def get_table_session_bill_api(id: str, current_user: dict = Depends(get_current_user)) -> dict:
+    return get_table_session_bill(id, current_user.get("shop_id"))
 
 
 @router.post("/table-sessions/{id}/close")
-def close_table_session_api(id: str) -> dict:
-    return close_table_session(id)
+def close_table_session_api(id: str, current_user: dict = Depends(get_current_user)) -> dict:
+    return close_table_session(id, current_user.get("shop_id"))
