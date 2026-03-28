@@ -57,49 +57,4 @@ def get_open_table_sessions(shop_id: str | None, table_id: str | None) -> list[d
     return [serialize_document(session) for session in sessions]
 
 
-def close_table_session(session_id: str, shop_id: str | None) -> dict:
-    """Close a table session and free the table after all orders are paid."""
-    if not shop_id:
-        raise HTTPException(status_code=400, detail="Missing shop_id for current user")
-        
-    db = get_db()
 
-    try:
-        session_obj_id = to_object_id(session_id, "session_id")
-        shop_obj_id = to_object_id(shop_id, "shop_id")
-    except BadObjectIdError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    session = db.table_sessions.find_one({"_id": session_obj_id, "shop_id": shop_obj_id})
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    if session.get("status") != "open":
-        raise HTTPException(status_code=400, detail="Session is not open")
-
-    unpaid_orders = db.orders.find_one(
-        {"session_id": session_obj_id, "status": {"$ne": "paid"}}
-    )
-    if unpaid_orders:
-        raise HTTPException(status_code=400, detail="Cannot close session with unpaid orders")
-
-    db.table_sessions.find_one_and_update(
-        {"_id": session_obj_id},
-        {
-            "$set": {
-                "status": "closed",
-                "closed_at": datetime.now(tz=timezone.utc),
-            }
-        },
-        return_document=ReturnDocument.AFTER,
-    )
-
-    table_id = session.get("table_id")
-    if table_id:
-        db.tables.find_one_and_update(
-            {"_id": table_id},
-            {"$set": {"status": "available"}},
-        )
-
-    updated_session = db.table_sessions.find_one({"_id": session_obj_id})
-    return serialize_document(updated_session)

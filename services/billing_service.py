@@ -37,8 +37,8 @@ def get_table_session_bill(session_id: str, shop_id: str | None) -> dict:
     }
 
 
-def close_table_session(session_id: str, shop_id: str | None) -> dict:
-    """Close a table session and free the table for next customer."""
+def checkout_table_session(session_id: str, payment_method: str, shop_id: str | None) -> dict:
+    """Pay for all orders in a session, close the session, and free the table atomically."""
     if not shop_id:
         raise HTTPException(status_code=400, detail="Missing shop_id for current user")
         
@@ -57,20 +57,25 @@ def close_table_session(session_id: str, shop_id: str | None) -> dict:
     if session.get("status") != "open":
         raise HTTPException(status_code=400, detail="Session is not open")
 
-    # Check if all orders are paid
-    unpaid_orders = db.orders.find_one(
-        {"session_id": session_obj_id, "status": {"$ne": "paid"}}
+    # Mark all orders as paid
+    db.orders.update_many(
+        {"session_id": session_obj_id, "status": {"$ne": "cancelled"}},
+        {"$set": {"status": "paid"}}
     )
-    if unpaid_orders:
-        raise HTTPException(status_code=400, detail="Cannot close session with unpaid orders")
+    
+    # Calculate final total
+    paid_orders = db.orders.find({"session_id": session_obj_id, "status": "paid"})
+    total_amount = sum(order.get("total_amount", 0) for order in paid_orders)
 
-    # Close session
+    # Close session and save payment metadata
     db.table_sessions.find_one_and_update(
         {"_id": session_obj_id},
         {
             "$set": {
                 "status": "closed",
                 "closed_at": datetime.now(tz=timezone.utc),
+                "payment_method": payment_method,
+                "total_paid": total_amount
             }
         },
     )

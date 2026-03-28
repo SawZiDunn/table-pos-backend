@@ -4,7 +4,6 @@ from database import close_db, connect_db
 from routes.auth import router as auth_router
 from routes.categories import router as categories_router
 from routes.orders import router as orders_router
-from routes.payments import router as payments_router
 from routes.products import router as products_router
 from routes.reports import router as reports_router
 from routes.shop import router as shop_router
@@ -32,5 +31,4 @@ app.include_router(table_sessions_router)
 app.include_router(orders_router)
 app.include_router(products_router)
 app.include_router(categories_router)
-app.include_router(payments_router)
 app.include_router(reports_router)
