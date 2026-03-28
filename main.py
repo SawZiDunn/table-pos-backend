@@ -25,11 +25,6 @@ def shutdown() -> None:
     close_db()
 
 
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
 app.include_router(auth_router)
 app.include_router(shop_router)
 app.include_router(tables_router)

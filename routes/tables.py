@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
 from schemas.tables import TableCreateRequest, TableUpdateRequest
+from services.auth_helpers import require_role
 from services.tables_service import create_table, get_tables, update_table
 
 
@@ -13,10 +14,17 @@ def get_tables_api(shop_id: str = Query(...)) -> list[dict]:
 
 
 @router.post("/tables")
-def create_table_api(payload: TableCreateRequest) -> dict:
-    return create_table(payload)
+def create_table_api(
+    payload: TableCreateRequest,
+    current_user: dict = Depends(require_role("manager")),
+) -> dict:
+    return create_table(payload, current_user)
 
 
 @router.put("/tables/{id}")
-def update_table_api(id: str, payload: TableUpdateRequest) -> dict:
-    return update_table(id, payload)
+def update_table_api(
+    id: str,
+    payload: TableUpdateRequest,
+    current_user: dict = Depends(require_role("manager", "staff")),
+) -> dict:
+    return update_table(id, payload, current_user)

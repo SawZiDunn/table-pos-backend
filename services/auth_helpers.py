@@ -37,11 +37,16 @@ def get_current_user(payload: dict = Depends(verify_token)) -> dict:
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     
+    shop_id = payload.get("shop_id")
+    if shop_id:
+        to_object_id(shop_id, "shop_id")
+
     return {
         "id": str(user["_id"]),
         "email": user.get("email"),
         "role": user.get("role", "staff"),  # Default to staff if role missing
         "name": user.get("name"),
+        "shop_id": shop_id,
     }
 
 
