@@ -9,10 +9,18 @@ from routes.reports import router as reports_router
 from routes.shop import router as shop_router
 from routes.table_sessions import router as table_sessions_router
 from routes.tables import router as tables_router
+from fastapi.middleware.cors import CORSMiddleware
 
 
 app = FastAPI(title="Table POS Backend", version="0.1.0")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 def startup() -> None:
