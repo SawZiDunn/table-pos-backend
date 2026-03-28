@@ -79,7 +79,12 @@ def login(payload: LoginRequest) -> dict:
     shop_id_str = str(shop_id_raw) if shop_id_raw else None
 
     if shop_id_raw:
-        shop = db.shops.find_one({"_id": shop_id_raw, "is_active": True})
+        try:
+            shop_obj_id = to_object_id(shop_id_raw, "shop_id")
+        except BadObjectIdError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            
+        shop = db.shops.find_one({"_id": shop_obj_id, "is_active": True})
         if not shop:
             raise HTTPException(status_code=404, detail="Assigned shop not found or inactive")
 
