@@ -31,12 +31,13 @@ def create_table(payload: TableCreateRequest, shop_id: str | None) -> dict:
     except BadObjectIdError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    existing_count = db.tables.count_documents({"shop_id": shop_obj_id})
-    table_name = f"Table {existing_count + 1}"
+    existing_table = db.tables.find_one({"shop_id": shop_obj_id, "table_number": payload.table_number})
+    if existing_table:
+        raise HTTPException(status_code=409, detail="Table number already exists")
 
     table_doc = {
         "shop_id": shop_obj_id,
-        "name": table_name,
+        "table_number": payload.table_number,
         "capacity": payload.capacity,
         "status": payload.status,
         "is_active": True,
