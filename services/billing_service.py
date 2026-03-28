@@ -6,6 +6,14 @@ from database import get_db
 from services.mongo_helpers import BadObjectIdError, serialize_document, to_object_id
 
 
+def _calculate_bill(subtotal: float, tax_percent: float) -> tuple[float, float, float]:
+    rounded_subtotal = round(float(subtotal), 2)
+    safe_tax_percent = max(0.0, min(float(tax_percent or 0), 100.0))
+    tax_amount = round((rounded_subtotal * safe_tax_percent) / 100.0, 2)
+    total_bill = round(rounded_subtotal + tax_amount, 2)
+    return rounded_subtotal, tax_amount, total_bill
+
+
 def get_table_session_bill(session_id: str, shop_id: str | None) -> dict:
     """Calculate total bill for a table session from all orders."""
     if not shop_id:
@@ -23,14 +31,22 @@ def get_table_session_bill(session_id: str, shop_id: str | None) -> dict:
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    orders = db.orders.find({"session_id": session_obj_id})
-    total_bill = sum(order.get("total_amount", 0) for order in orders)
-    order_count = db.orders.count_documents({"session_id": session_obj_id})
+    shop = db.shops.find_one({"_id": shop_obj_id})
+    shop_settings = (shop or {}).get("settings", {})
+    tax_percent = shop_settings.get("tax_percent", 0)
+
+    orders = db.orders.find({"session_id": session_obj_id, "status": {"$ne": "cancelled"}})
+    subtotal = sum(order.get("total_amount", 0) for order in orders)
+    order_count = db.orders.count_documents({"session_id": session_obj_id, "status": {"$ne": "cancelled"}})
+    subtotal, tax_amount, total_bill = _calculate_bill(subtotal, tax_percent)
 
     return {
         "session_id": session_id,
         "table_id": str(session.get("table_id", "")),
         "shop_id": str(session.get("shop_id", "")),
+        "subtotal": subtotal,
+        "tax_percent": tax_percent,
+        "tax_amount": tax_amount,
         "total_bill": total_bill,
         "order_count": order_count,
         "status": session.get("status"),
@@ -64,8 +80,13 @@ def checkout_table_session(session_id: str, payment_method: str, shop_id: str | 
     )
     
     # Calculate final total
+    shop = db.shops.find_one({"_id": shop_obj_id})
+    shop_settings = (shop or {}).get("settings", {})
+    tax_percent = shop_settings.get("tax_percent", 0)
+
     paid_orders = db.orders.find({"session_id": session_obj_id, "status": "paid"})
-    total_amount = sum(order.get("total_amount", 0) for order in paid_orders)
+    subtotal = sum(order.get("total_amount", 0) for order in paid_orders)
+    subtotal, tax_amount, total_amount = _calculate_bill(subtotal, tax_percent)
 
     # Close session and save payment metadata
     db.table_sessions.find_one_and_update(
@@ -75,7 +96,10 @@ def checkout_table_session(session_id: str, payment_method: str, shop_id: str | 
                 "status": "closed",
                 "closed_at": datetime.now(tz=timezone.utc),
                 "payment_method": payment_method,
-                "total_paid": total_amount
+                "subtotal": subtotal,
+                "tax_percent": tax_percent,
+                "tax_amount": tax_amount,
+                "total_paid": total_amount,
             }
         },
     )

@@ -28,6 +28,9 @@ def upsert_shop(payload: ShopUpsertRequest) -> dict:
         "is_active": payload.is_active,
     }
 
+    if payload.settings is not None:
+        update_doc["settings"] = payload.settings.model_dump()
+
     if payload.id:
         try:
             shop_obj_id = to_object_id(payload.id, "id")
