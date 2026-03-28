@@ -6,6 +6,7 @@ from pydantic import BaseModel, EmailStr
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    role: Literal["manager", "staff"] | None = None
 
 
 class RegisterRequest(BaseModel):

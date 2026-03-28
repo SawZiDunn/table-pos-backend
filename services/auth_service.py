@@ -18,6 +18,7 @@ def _build_access_token(user: dict, shop_id: str | None = None) -> str:
     token_payload = {
         "sub": str(user["_id"]),
         "email": user["email"],
+        "role": user.get("role", "staff"),
         "exp": datetime.now(tz=timezone.utc) + timedelta(hours=8),
     }
     if shop_id:
@@ -118,4 +119,11 @@ def register(payload: RegisterRequest) -> dict:
         "access_token": _build_access_token(user_doc),
         "token_type": "bearer",
         "user": _serialize_user(user_doc),
+    }
+
+
+def logout(current_user: dict) -> dict:
+    return {
+        "message": "Logged out successfully",
+        "user_id": current_user.get("id"),
     }

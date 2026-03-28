@@ -80,3 +80,45 @@ def update_table(table_id: str, payload: TableUpdateRequest, shop_id: str | None
         return_document=ReturnDocument.AFTER,
     )
     return serialize_document(updated)
+
+
+def delete_table(table_id: str, shop_id: str | None) -> dict:
+    if not shop_id:
+        raise HTTPException(status_code=400, detail="Missing shop_id for current user")
+
+    db = get_db()
+
+    try:
+        table_obj_id = to_object_id(table_id, "id")
+    except BadObjectIdError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        shop_obj_id = to_object_id(shop_id, "shop_id")
+    except BadObjectIdError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    existing_table = db.tables.find_one({"_id": table_obj_id})
+    if not existing_table:
+        raise HTTPException(status_code=404, detail="Table not found")
+
+    if existing_table.get("shop_id") != shop_obj_id:
+        raise HTTPException(status_code=403, detail="Shop access denied")
+
+    open_session = db.table_sessions.find_one(
+        {"table_id": table_obj_id, "shop_id": shop_obj_id, "status": "open"}
+    )
+    if open_session:
+        raise HTTPException(status_code=400, detail="Cannot delete table with an open session")
+
+    orders_result = db.orders.delete_many({"table_id": table_obj_id, "shop_id": shop_obj_id})
+    sessions_result = db.table_sessions.delete_many({"table_id": table_obj_id, "shop_id": shop_obj_id})
+    table_result = db.tables.delete_one({"_id": table_obj_id, "shop_id": shop_obj_id})
+    if table_result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Table not found")
+
+    return {
+        "deleted_table_id": table_id,
+        "deleted_sessions": sessions_result.deleted_count,
+        "deleted_orders": orders_result.deleted_count,
+    }
