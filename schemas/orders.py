@@ -2,10 +2,8 @@ from pydantic import BaseModel, Field
 
 
 class OrderItem(BaseModel):
-    product_id: str | None = None
-    name: str
+    product_id: str
     quantity: int = Field(ge=1)
-    unit_price: float = Field(ge=0)
 
 
 class OrderCreateRequest(BaseModel):

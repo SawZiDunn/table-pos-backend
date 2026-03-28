@@ -8,7 +8,7 @@ from schemas.table_sessions import TableSessionCreateRequest
 from services.mongo_helpers import BadObjectIdError, serialize_document, to_object_id
 
 
-def create_table_session(payload: TableSessionCreateRequest, shop_id: str | None) -> dict:
+def create_table_session(payload: TableSessionCreateRequest, shop_id: str | None, user_id: str | None) -> dict:
     if not shop_id:
         raise HTTPException(status_code=400, detail="Missing shop_id for current user")
         
@@ -27,7 +27,7 @@ def create_table_session(payload: TableSessionCreateRequest, shop_id: str | None
     session_doc = {
         "table_id": table_obj_id,
         "shop_id": shop_obj_id,
-        "opened_by": payload.opened_by,
+        "opened_by": user_id,
         "status": "open",
         "opened_at": datetime.now(tz=timezone.utc),
         "closed_at": None,

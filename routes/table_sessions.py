@@ -11,7 +11,7 @@ router = APIRouter(tags=["table_sessions"])
 
 @router.post("/table-sessions")
 def create_table_session_api(payload: TableSessionCreateRequest, current_user: dict = Depends(get_current_user)) -> dict:
-    return create_table_session(payload, current_user.get("shop_id"))
+    return create_table_session(payload, current_user.get("shop_id"), current_user.get("id"))
 
 
 @router.get("/table-sessions/open")

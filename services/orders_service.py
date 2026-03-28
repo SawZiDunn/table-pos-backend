@@ -28,14 +28,47 @@ def create_order(payload: OrderCreateRequest, shop_id: str | None) -> dict:
     if not session:
         raise HTTPException(status_code=404, detail="Open session not found")
 
-    items = [item.model_dump() for item in payload.items]
-    total_amount = sum(item["quantity"] * item["unit_price"] for item in items)
+    items_payload = payload.items
+    product_ids = []
+    for item in items_payload:
+        try:
+            product_ids.append(to_object_id(item.product_id, "product_id"))
+        except BadObjectIdError as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid product_id: {item.product_id}") from exc
+
+    # Fetch all requested products that belong to this shop securely
+    products_cursor = db.products.find({"_id": {"$in": product_ids}, "shop_id": shop_obj_id})
+    products_map = {str(p["_id"]): p for p in products_cursor}
+
+    processed_items = []
+    total_amount = 0.0
+
+    for item in items_payload:
+        product_str_id = item.product_id
+        if product_str_id not in products_map:
+            raise HTTPException(status_code=400, detail=f"Product {product_str_id} not found in your shop")
+            
+        real_product = products_map[product_str_id]
+        
+        if not real_product.get("is_available", True):
+            raise HTTPException(status_code=400, detail=f"Product '{real_product['name']}' is currently unavailable")
+
+        qty = item.quantity
+        price = real_product["price"]
+        total_amount += (qty * price)
+
+        processed_items.append({
+            "product_id": str(real_product["_id"]),
+            "name": real_product["name"],
+            "unit_price": price,
+            "quantity": qty
+        })
 
     order_doc = {
         "shop_id": shop_obj_id,
         "table_id": table_obj_id,
         "session_id": session_obj_id,
-        "items": items,
+        "items": processed_items,
         "notes": payload.notes,
         "status": payload.status,
         "total_amount": total_amount,
