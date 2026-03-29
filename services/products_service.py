@@ -1,9 +1,9 @@
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 from pymongo import ReturnDocument
 
 from database import get_db
-from schemas.products import ProductCreateRequest, ProductUpdateRequest
 from services.mongo_helpers import BadObjectIdError, serialize_document, to_object_id
+from services.cloudinary_service import delete_image, upload_image
 
 
 def get_products(shop_id: str | None, category_id: str | None) -> list[dict]:
@@ -28,9 +28,19 @@ def get_products(shop_id: str | None, category_id: str | None) -> list[dict]:
     return [serialize_document(product) for product in products]
 
 
-def create_product(payload: ProductCreateRequest, shop_id: str | None) -> dict:
+def create_product(
+    name: str,
+    price: float,
+    category_id: str | None,
+    is_available: bool,
+    image_file: UploadFile | None,
+    shop_id: str | None,
+) -> dict:
     if not shop_id:
         raise HTTPException(status_code=400, detail="User does not have an assigned shop.")
+
+    if not image_file:
+        raise HTTPException(status_code=400, detail="Image is required")
 
     db = get_db()
 
@@ -40,18 +50,24 @@ def create_product(payload: ProductCreateRequest, shop_id: str | None) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     category_obj_id = None
-    if payload.category_id:
+    if category_id:
         try:
-            category_obj_id = to_object_id(payload.category_id, "category_id")
+            category_obj_id = to_object_id(category_id, "category_id")
         except BadObjectIdError as exc:
             raise HTTPException(status_code=400, detail=f"Invalid category_id: {str(exc)}") from exc
+
+    upload_result = upload_image(image_file)
+    if not upload_result.get("url") or not upload_result.get("public_id"):
+        raise HTTPException(status_code=500, detail="Image upload failed")
 
     product_doc = {
         "shop_id": shop_obj_id,
         "category_id": category_obj_id,
-        "name": payload.name,
-        "price": payload.price,
-        "is_available": payload.is_available,
+        "name": name,
+        "price": price,
+        "is_available": is_available,
+        "image_url": upload_result["url"],
+        "image_public_id": upload_result["public_id"],
     }
 
     inserted = db.products.insert_one(product_doc)
@@ -59,7 +75,15 @@ def create_product(payload: ProductCreateRequest, shop_id: str | None) -> dict:
     return serialize_document(created)
 
 
-def update_product(product_id: str, payload: ProductUpdateRequest, shop_id: str | None) -> dict:
+def update_product(
+    product_id: str,
+    name: str | None,
+    price: float | None,
+    category_id: str | None,
+    is_available: bool | None,
+    image_file: UploadFile | None,
+    shop_id: str | None,
+) -> dict:
     if not shop_id:
         raise HTTPException(status_code=400, detail="User does not have an assigned shop.")
         
@@ -71,12 +95,32 @@ def update_product(product_id: str, payload: ProductUpdateRequest, shop_id: str 
     except BadObjectIdError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    updates = payload.model_dump(exclude_none=True)
-    if "category_id" in updates and updates["category_id"]:
+    existing_product = db.products.find_one({"_id": product_obj_id, "shop_id": shop_obj_id})
+    if not existing_product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    updates: dict = {}
+    if name is not None:
+        updates["name"] = name
+    if price is not None:
+        updates["price"] = price
+    if is_available is not None:
+        updates["is_available"] = is_available
+    if category_id is not None:
         try:
-            updates["category_id"] = to_object_id(updates["category_id"], "category_id")
+            updates["category_id"] = to_object_id(category_id, "category_id")
         except BadObjectIdError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if image_file is not None:
+        upload_result = upload_image(image_file)
+        if not upload_result.get("url") or not upload_result.get("public_id"):
+            raise HTTPException(status_code=500, detail="Image upload failed")
+        old_public_id = existing_product.get("image_public_id")
+        if old_public_id:
+            delete_image(old_public_id)
+        updates["image_url"] = upload_result["url"]
+        updates["image_public_id"] = upload_result["public_id"]
 
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -86,9 +130,6 @@ def update_product(product_id: str, payload: ProductUpdateRequest, shop_id: str 
         {"$set": updates},
         return_document=ReturnDocument.AFTER,
     )
-    if not updated:
-        raise HTTPException(status_code=404, detail="Product not found")
-
     return serialize_document(updated)
 
 
@@ -103,6 +144,14 @@ def delete_product(product_id: str, shop_id: str | None) -> dict:
         product_obj_id = to_object_id(product_id, "id")
     except BadObjectIdError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    product = db.products.find_one({"_id": product_obj_id, "shop_id": shop_obj_id})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    public_id = product.get("image_public_id")
+    if public_id:
+        delete_image(public_id)
 
     result = db.products.delete_one({"_id": product_obj_id, "shop_id": shop_obj_id})
     if result.deleted_count == 0:
