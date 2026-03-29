@@ -76,6 +76,9 @@ def login(payload: LoginRequest) -> dict:
     if not is_password_valid:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    if payload.role and user.get("role") != payload.role:
+        raise HTTPException(status_code=401, detail="Mismatched Role Information")
+
     shop_id_raw = user.get("shop_id")
     shop_id_str = str(shop_id_raw) if shop_id_raw else None
 

@@ -28,39 +28,35 @@ def get_products(shop_id: str | None, category_id: str | None) -> list[dict]:
     return [serialize_document(product) for product in products]
 
 
-def create_products_bulk(payload: list[ProductCreateRequest], shop_id: str | None) -> list[dict]:
+def create_product(payload: ProductCreateRequest, shop_id: str | None) -> dict:
     if not shop_id:
         raise HTTPException(status_code=400, detail="User does not have an assigned shop.")
 
     db = get_db()
-    if not payload:
-        return []
 
     try:
         shop_obj_id = to_object_id(shop_id, "shop_id")
     except BadObjectIdError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    product_docs = []
-    for item in payload:
-        category_obj_id = None
-        if item.category_id:
-            try:
-                category_obj_id = to_object_id(item.category_id, "category_id")
-            except BadObjectIdError as exc:
-                raise HTTPException(status_code=400, detail=f"Invalid category_id for '{item.name}': {str(exc)}") from exc
+    category_obj_id = None
+    if payload.category_id:
+        try:
+            category_obj_id = to_object_id(payload.category_id, "category_id")
+        except BadObjectIdError as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid category_id: {str(exc)}") from exc
 
-        product_docs.append({
-            "shop_id": shop_obj_id,
-            "category_id": category_obj_id,
-            "name": item.name,
-            "price": item.price,
-            "is_available": item.is_available,
-        })
+    product_doc = {
+        "shop_id": shop_obj_id,
+        "category_id": category_obj_id,
+        "name": payload.name,
+        "price": payload.price,
+        "is_available": payload.is_available,
+    }
 
-    inserted = db.products.insert_many(product_docs)
-    created = db.products.find({"_id": {"$in": inserted.inserted_ids}})
-    return [serialize_document(product) for product in created]
+    inserted = db.products.insert_one(product_doc)
+    created = db.products.find_one({"_id": inserted.inserted_id})
+    return serialize_document(created)
 
 
 def update_product(product_id: str, payload: ProductUpdateRequest, shop_id: str | None) -> dict:
@@ -94,3 +90,22 @@ def update_product(product_id: str, payload: ProductUpdateRequest, shop_id: str 
         raise HTTPException(status_code=404, detail="Product not found")
 
     return serialize_document(updated)
+
+
+def delete_product(product_id: str, shop_id: str | None) -> dict:
+    if not shop_id:
+        raise HTTPException(status_code=400, detail="User does not have an assigned shop.")
+
+    db = get_db()
+
+    try:
+        shop_obj_id = to_object_id(shop_id, "shop_id")
+        product_obj_id = to_object_id(product_id, "id")
+    except BadObjectIdError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    result = db.products.delete_one({"_id": product_obj_id, "shop_id": shop_obj_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    return {"deleted_product_id": product_id}
