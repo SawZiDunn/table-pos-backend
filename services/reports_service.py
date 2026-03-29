@@ -44,12 +44,35 @@ def get_shop_summary(shop_id: str | None, period: str) -> dict:
     # Calculate total orders linked to these exact closed sessions
     session_ids = [session["_id"] for session in closed_sessions]
     total_orders = 0
+    top_items: list[dict] = []
     if session_ids:
         # We only count orders that were successfully paid (ignoring cancelled ones inside the session)
         total_orders = db.orders.count_documents({
             "session_id": {"$in": session_ids},
             "status": "paid"
         })
+
+        pipeline = [
+            {"$match": {"session_id": {"$in": session_ids}, "status": "paid"}},
+            {"$unwind": "$items"},
+            {
+                "$group": {
+                    "_id": "$items.product_id",
+                    "name": {"$first": "$items.name"},
+                    "quantity": {"$sum": "$items.quantity"},
+                    "revenue": {
+                        "$sum": {
+                            "$multiply": ["$items.unit_price", "$items.quantity"]
+                        }
+                    },
+                }
+            },
+            {"$sort": {"quantity": -1, "revenue": -1}},
+            {"$limit": 5},
+        ]
+        top_items = list(db.orders.aggregate(pipeline))
+        for item in top_items:
+            item["product_id"] = str(item.pop("_id"))
         
     average_bill = total_revenue / total_closed_sessions if total_closed_sessions > 0 else 0.0
 
@@ -59,5 +82,6 @@ def get_shop_summary(shop_id: str | None, period: str) -> dict:
         "total_closed_sessions": total_closed_sessions,
         "total_orders": total_orders,
         "average_bill_per_session": average_bill,
+        "top_items": top_items,
         "currency": "USD" # Can be dynamic later
     }
