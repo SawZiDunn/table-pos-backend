@@ -73,9 +73,9 @@ def checkout_table_session(session_id: str, payment_method: str, shop_id: str | 
     if session.get("status") != "open":
         raise HTTPException(status_code=400, detail="Session is not open")
 
-    # Mark all orders as paid
+    # Mark only prepared/served orders as paid (exclude pending/cancelled)
     db.orders.update_many(
-        {"session_id": session_obj_id, "status": {"$ne": "cancelled"}},
+        {"session_id": session_obj_id, "status": {"$nin": ["pending", "cancelled"]}},
         {"$set": {"status": "paid"}}
     )
     

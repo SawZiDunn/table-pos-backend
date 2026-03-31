@@ -117,6 +117,13 @@ def update_order_status(order_id: str, status: str, shop_id: str | None) -> dict
     except BadObjectIdError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    if status == "cancelled":
+        existing = db.orders.find_one({"_id": order_obj_id, "shop_id": shop_obj_id})
+        if not existing:
+            raise HTTPException(status_code=404, detail="Order not found")
+        if existing.get("status") != "pending":
+            raise HTTPException(status_code=400, detail="Order is already being prepared")
+
     updated = db.orders.find_one_and_update(
         {"_id": order_obj_id, "shop_id": shop_obj_id},
         {"$set": {"status": status}},
