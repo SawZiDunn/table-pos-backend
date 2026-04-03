@@ -9,6 +9,7 @@ from routes.reports import router as reports_router
 from routes.shop import router as shop_router
 from routes.table_sessions import router as table_sessions_router
 from routes.tables import router as tables_router
+from routes.users import router as users_router
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -40,3 +41,4 @@ app.include_router(orders_router)
 app.include_router(products_router)
 app.include_router(categories_router)
 app.include_router(reports_router)
+app.include_router(users_router)
