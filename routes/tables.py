@@ -25,7 +25,7 @@ def create_table_api(
 def update_table_api(
     id: str,
     payload: TableUpdateRequest,
-    current_user: dict = Depends(require_role("manager", "staff")),
+    current_user: dict = Depends(require_role("manager")),
 ) -> dict:
     return update_table(id, payload, current_user.get("shop_id"))
 
