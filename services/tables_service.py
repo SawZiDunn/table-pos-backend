@@ -16,8 +16,21 @@ def get_tables(shop_id: str | None) -> list[dict]:
     except BadObjectIdError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    tables = db.tables.find({"shop_id": shop_obj_id})
-    return [serialize_document(table) for table in tables]
+    tables = list(db.tables.find({"shop_id": shop_obj_id}))
+    open_sessions = db.table_sessions.find(
+        {"shop_id": shop_obj_id, "status": "open"},
+        {"table_id": 1},
+    )
+    open_table_ids = {str(session.get("table_id")) for session in open_sessions}
+
+    result = []
+    for table in tables:
+        table_id_str = str(table.get("_id"))
+        serialized = serialize_document(table)
+        serialized["status"] = "occupied" if table_id_str in open_table_ids else "available"
+        result.append(serialized)
+
+    return result
 
 
 def create_table(payload: TableCreateRequest, shop_id: str | None) -> dict:

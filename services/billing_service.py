@@ -90,7 +90,7 @@ def checkout_table_session(session_id: str, payment_method: str, shop_id: str | 
 
     # Close session and save payment metadata
     db.table_sessions.find_one_and_update(
-        {"_id": session_obj_id},
+        {"_id": session_obj_id, "shop_id": shop_obj_id},
         {
             "$set": {
                 "status": "closed",

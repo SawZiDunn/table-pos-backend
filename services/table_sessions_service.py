@@ -24,7 +24,9 @@ def create_table_session(payload: TableSessionCreateRequest, shop_id: str | None
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
 
-    existing_open = db.table_sessions.find_one({"table_id": table_obj_id, "status": "open"})
+    existing_open = db.table_sessions.find_one(
+        {"table_id": table_obj_id, "shop_id": shop_obj_id, "status": "open"}
+    )
     if existing_open:
         raise HTTPException(status_code=409, detail="Table already has an open session")
 
@@ -41,6 +43,10 @@ def create_table_session(payload: TableSessionCreateRequest, shop_id: str | None
     }
 
     inserted = db.table_sessions.insert_one(session_doc)
+    db.tables.find_one_and_update(
+        {"_id": table_obj_id, "shop_id": shop_obj_id},
+        {"$set": {"status": "occupied"}},
+    )
     created = db.table_sessions.find_one({"_id": inserted.inserted_id})
     return serialize_document(created)
 
